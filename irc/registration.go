@@ -64,14 +64,14 @@ func NewAccountRegistration(config AccountRegistrationConfig) (accountReg Accoun
 	return accountReg
 }
 
-// regHandler parses the REG command.
-func regHandler(server *Server, client *Client, msg ircmsg.IrcMessage) bool {
+// accHandler parses the ACC command.
+func accHandler(server *Server, client *Client, msg ircmsg.IrcMessage) bool {
 	subcommand := strings.ToLower(msg.Params[0])
 
-	if subcommand == "create" {
-		return regCreateHandler(server, client, msg)
+	if subcommand == "register" {
+		return accRegisterHandler(server, client, msg)
 	} else if subcommand == "verify" {
-		client.Notice("Parsing VERIFY")
+		client.Notice("VERIFY is not yet implemented")
 	} else {
 		client.Send(nil, server.name, ERR_UNKNOWNERROR, client.nick, "REG", msg.Params[0], "Unknown subcommand")
 	}
@@ -79,8 +79,8 @@ func regHandler(server *Server, client *Client, msg ircmsg.IrcMessage) bool {
 	return false
 }
 
-// removeFailedRegCreateData removes the data created by REG CREATE if the account creation fails early.
-func removeFailedRegCreateData(store *buntdb.DB, account string) {
+// removeFailedAccRegisterData removes the data created by ACC REGISTER if the account creation fails early.
+func removeFailedAccRegisterData(store *buntdb.DB, account string) {
 	// error is ignored here, we can't do much about it anyways
 	store.Update(func(tx *buntdb.Tx) error {
 		tx.Delete(fmt.Sprintf(keyAccountExists, account))
@@ -91,8 +91,8 @@ func removeFailedRegCreateData(store *buntdb.DB, account string) {
 	})
 }
 
-// regCreateHandler parses the REG CREATE command.
-func regCreateHandler(server *Server, client *Client, msg ircmsg.IrcMessage) bool {
+// accRegisterHandler parses the ACC REGISTER command.
+func accRegisterHandler(server *Server, client *Client, msg ircmsg.IrcMessage) bool {
 	// get and sanitise account name
 	account := strings.TrimSpace(msg.Params[1])
 	casefoldedAccount, err := CasefoldName(account)
@@ -156,7 +156,7 @@ func regCreateHandler(server *Server, client *Client, msg ircmsg.IrcMessage) boo
 
 	if !callbackValid {
 		client.Send(nil, server.name, ERR_REG_INVALID_CALLBACK, client.nick, account, callbackNamespace, "Callback namespace is not supported")
-		removeFailedRegCreateData(server.store, casefoldedAccount)
+		removeFailedAccRegisterData(server.store, casefoldedAccount)
 		return false
 	}
 
@@ -171,7 +171,7 @@ func regCreateHandler(server *Server, client *Client, msg ircmsg.IrcMessage) boo
 		credentialValue = msg.Params[3]
 	} else {
 		client.Send(nil, server.name, ERR_NEEDMOREPARAMS, client.nick, msg.Command, "Not enough parameters")
-		removeFailedRegCreateData(server.store, casefoldedAccount)
+		removeFailedAccRegisterData(server.store, casefoldedAccount)
 		return false
 	}
 
@@ -184,13 +184,13 @@ func regCreateHandler(server *Server, client *Client, msg ircmsg.IrcMessage) boo
 	}
 	if credentialType == "certfp" && client.certfp == "" {
 		client.Send(nil, server.name, ERR_REG_INVALID_CRED_TYPE, client.nick, credentialType, callbackNamespace, "You are not using a certificiate")
-		removeFailedRegCreateData(server.store, casefoldedAccount)
+		removeFailedAccRegisterData(server.store, casefoldedAccount)
 		return false
 	}
 
 	if !credentialValid {
 		client.Send(nil, server.name, ERR_REG_INVALID_CRED_TYPE, client.nick, credentialType, callbackNamespace, "Credential type is not supported")
-		removeFailedRegCreateData(server.store, casefoldedAccount)
+		removeFailedAccRegisterData(server.store, casefoldedAccount)
 		return false
 	}
 
@@ -243,7 +243,7 @@ func regCreateHandler(server *Server, client *Client, msg ircmsg.IrcMessage) boo
 		}
 		client.Send(nil, server.name, ERR_UNKNOWNERROR, client.nick, "REG", "CREATE", errMsg)
 		log.Println("Could not save registration creds:", err.Error())
-		removeFailedRegCreateData(server.store, casefoldedAccount)
+		removeFailedAccRegisterData(server.store, casefoldedAccount)
 		return false
 	}
 
@@ -270,7 +270,7 @@ func regCreateHandler(server *Server, client *Client, msg ircmsg.IrcMessage) boo
 		if err != nil {
 			client.Send(nil, server.name, ERR_UNKNOWNERROR, client.nick, "REG", "CREATE", "Could not register")
 			log.Println("Could not save verification confirmation (*):", err.Error())
-			removeFailedRegCreateData(server.store, casefoldedAccount)
+			removeFailedAccRegisterData(server.store, casefoldedAccount)
 			return false
 		}
 
